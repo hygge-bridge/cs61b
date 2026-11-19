@@ -5,7 +5,7 @@ import java.util.Observable;
 
 
 /** The state of a game of 2048.
- *  @author TODO: YOUR NAME HERE
+ *  @author TODO: hygge
  */
 public class Model extends Observable {
     /** Current contents of the board. */
@@ -113,12 +113,63 @@ public class Model extends Observable {
         // TODO: Modify this.board (and perhaps this.score) to account
         // for the tilt to the Side SIDE. If the board changed, set the
         // changed local variable to true.
+        board.setViewingPerspective(side);
+        for (int c = 0; c < board.size(); ++c) {
+            if (tiltColumn(c)) {
+                changed = true;
+            }
+        }
+        board.setViewingPerspective(Side.NORTH);
 
         checkGameOver();
         if (changed) {
             setChanged();
         }
         return changed;
+    }
+
+    /** Returns true if there is at least a move in the column. */
+    private boolean tiltColumn(int col) {
+        boolean changed = false;
+        int mergeCount = 0;
+        for (int r = board.size() - 2; r >= 0; --r) {
+            Tile t = board.tile(col, r);
+            if (t == null) {
+                continue;
+            }
+            int targetRow = getTargetRow(col, r, mergeCount);
+            if (targetRow != r) {
+                Tile target = board.tile(col, targetRow);
+                if (target != null && target.value() == t.value()) {
+                    score += 2 * target.value();
+                    mergeCount += 1;
+                }
+                board.move(col, targetRow, t);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /** Return the target row if there is a move happened, otherwise return row. */
+    private int getTargetRow(int col, int row, int mergeCount) {
+        int limit = board.size() - mergeCount;
+        int targetRow = row + 1;
+        Tile t = board.tile(col, row);
+        for (; targetRow < board.size(); targetRow += 1) {
+            Tile target = board.tile(col, targetRow);
+            if (target == null) {
+                continue;
+            }
+            if (target.value() != t.value()) {
+                return targetRow - 1;
+            } else if (target.value() == t.value() && targetRow < limit) {
+                return targetRow;
+            } else {
+                return targetRow - 1;
+            }
+        }
+        return targetRow - 1;
     }
 
     /** Checks if the game is over and sets the gameOver variable
@@ -138,6 +189,13 @@ public class Model extends Observable {
      * */
     public static boolean emptySpaceExists(Board b) {
         // TODO: Fill in this function.
+        for (int i = 0; i < b.size(); ++i) {
+            for (int j = 0; j < b.size(); ++j) {
+                if (b.tile(j, i) == null) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -148,6 +206,14 @@ public class Model extends Observable {
      */
     public static boolean maxTileExists(Board b) {
         // TODO: Fill in this function.
+        for (int i = 0; i < b.size(); ++i) {
+            for (int j = 0; j < b.size(); ++j) {
+                Tile t = b.tile(j, i);
+                if (t != null && t.value() == MAX_PIECE) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -159,9 +225,18 @@ public class Model extends Observable {
      */
     public static boolean atLeastOneMoveExists(Board b) {
         // TODO: Fill in this function.
+        if (emptySpaceExists(b)) {
+            return true;
+        }
+        for (int col = 0; col < b.size(); ++col) {
+            for (int row = 0; row < b.size(); ++row) {
+                if (atLeastOneAdjacentSameValueExists(b, col, row)) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
-
 
     @Override
      /** Returns the model as a string, used for debugging. */
@@ -199,5 +274,34 @@ public class Model extends Observable {
     /** Returns hash code of Model’s string. */
     public int hashCode() {
         return toString().hashCode();
+    }
+
+    /** Returns true if there exists at least one tile on the board that has an adjacent tile with the same value, assuming no tiles on the board are null. */
+    private static boolean atLeastOneAdjacentSameValueExists(Board b, int col, int row) {
+        Tile center = getTile(b, col, row);
+        Tile up = getTile(b, col, row - 1);
+        Tile bottom = getTile(b, col, row + 1);
+        Tile left = getTile(b, col - 1, row);
+        Tile right = getTile(b, col + 1, row);
+        return checkEuqal(center, up) || checkEuqal(center, bottom) || checkEuqal(center, left) || checkEuqal(center, right);
+    }
+
+    /** Returns true if t1's value == t2's value. */
+    private static boolean checkEuqal(Tile t1, Tile t2) {
+        if (t1 == null || t2 == null) {
+            return false;
+        } else {
+            return t1.value() == t2.value();
+        }
+    }
+
+    /** Returns null if (row, col) is not a valid position, otherwise return tile. */
+    private static Tile getTile(Board b, int col, int row) {
+        return checkValidPos(b, col, row) ? b.tile(col, row) : null;
+    }
+
+    /** Returns true if row or col is in [0, b.size() - 1]. */
+    private static boolean checkValidPos(Board b, int col, int row) {
+        return (0 <= col && col < b.size()) && (0 <= row && row < b.size());
     }
 }
